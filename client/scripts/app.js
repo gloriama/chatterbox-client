@@ -4,6 +4,7 @@ var app = {
   _username: window.location.search.split('=')[1],
   _friendNames: {},
   _roomNames: {},
+  _currRoomName: 'lobby',
   server: 'https://api.parse.com/1/classes/chatterbox'
 };
 
@@ -30,9 +31,8 @@ app._escapeMap = {
 }
 
 app.init = function() {
-  $('.username').on("click", app.addFriend);
   $('#send .submit').on("click", app.handleSubmit);
-  $('#roomSelect a').on("click", app.handleRoomSelect);
+  $('#roomnamebox').val(app._currRoomName);
 };
 
 //------------- AJAX --------------
@@ -62,13 +62,24 @@ app.clearMessages = function() {
 app.addMessage = function(message) {
   app._lastObjectId = message.objectId;
 
+  //extract and sanitize data from message
   var username = (typeof message.username === 'string') ? message.username : '[undefined]';
   var text = (typeof message.text === 'string') ? message.text : '[undefined]';
   var roomname = (typeof message.roomname === 'string') ? message.roomname : '[undefined]';
+  var objectId = message.objectId; //guaranteed clean and defined by server
 
-  var usernameHtml = '<a href="#" class="username">' + app._sanitize(username) + '</a>';
-  var newNode = $( '<p data-roomname="' + roomname + '">' + usernameHtml + ': ' + app._sanitize(text) + '</p>' );
-  $('#chats').prepend(newNode);
+  //create message node and add to DOM
+  var $usernameNode = $('<a href="#" class="username" data-objectid="' + objectId + '"></a>');
+  $usernameNode.append(app._sanitize(username));
+
+  var $newNode = $( '<p data-roomname="' + roomname + '"></p>' );
+  $newNode.append($usernameNode);
+  $newNode.append(': ' + app._sanitize(text));
+
+  $('#chats').prepend($newNode);
+
+  //add listener to username link: when clicked, friend will be added to friends list
+  $usernameNode.on("click", app.addFriend);
 
   //add a room if the chatroom is new
   if (!app._roomNames[roomname]) {
@@ -78,14 +89,19 @@ app.addMessage = function(message) {
 };
 
 app.addRoom = function(roomName) {
-  var newNode = $( '<li><a href="#">' + roomName + '</li>' );
+  var $newNode = $( '<li><a href="#">' + roomName + '</li>' );
 
-  $('#roomSelect').append(newNode);
+  $('#roomSelect').append($newNode);
+  $newNode.on("click", app.handleRoomSelect);
 }
 
-app.addFriend = function(event) {
+app.addFriend = function(event) { //adds the dom node to the friends list
+  event.stopPropagation();
+  event.preventDefault();
+
   //get username from event
-  var friendName = event.target.childNodes[0].data;
+  console.log("!", arguments);
+  var friendName = event.target.text;
 
   if (!app._friendNames[friendName]) {
     var $friendNode = $('<li>' + friendName + '</li>');
@@ -99,17 +115,23 @@ app.handleSubmit = function(event) {
   event.stopPropagation();
   event.preventDefault();
 
-  //get the text from inputBox
+  //get the text from inputBox and roomNameBox
+  //clear them
   var text = $('#inputbox').val();
+  var roomname = $('#roomnamebox').val();
+  $('#inputbox').val('');
+
+  app._currRoomName = roomname;
 
   //call app.send on that text
-  app.send(new Message('hello', text), app.init);
-  //remove the text from inputBox
-  $('#inputbox').val('');
-};
+  app.send(new Message(roomname, text));};
 
 app.handleRoomSelect = function(event) {
   var roomName = event.target.childNodes[0].data;
+  app._currRoomName = roomName;
+
+  //populate the roomname in roomNameBox;
+  $('#roomnamebox').val(app._currRoomName);
 
   $('#chats p').each(function(index, node) {
     //access roomname of node
@@ -178,11 +200,15 @@ app._makeChatForm = function() {
   //create a form in jquery
   var $chatForm = $('<form id="send"></form>');
   var $inputBox = $('<input type="text" id="inputbox"></input>');
+  var $roomNameBox = $('<input type="text" id="roomnamebox"></input>');
   var $submitButton = $('<input type="submit" class="submit"></input>');
 
   //append it to body
   $('#main').append($chatForm);
+  $chatForm.append('Message text:');
   $chatForm.append($inputBox);
+  $chatForm.append('Room name:');
+  $chatForm.append($roomNameBox);
   $chatForm.append($submitButton);
 };
 
