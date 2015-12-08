@@ -27,12 +27,17 @@ app._lastObjectId = null;
 
 app._username = window.location.search.split('=')[1];
 
+app._friendNames = {};
+app._roomNames = {};
+
 app.server = 'https://api.parse.com/1/classes/chatterbox';
 
 app.init = function() {
   $('.username').on("click", app.addFriend);
 
   $('#send .submit').on("click", app.handleSubmit);
+
+  $('#roomSelect a').on("click", app.handleRoomSelect);
 };
 
 app.send = function(message, success) {
@@ -61,19 +66,34 @@ app.addMessage = function(message) {
 
   var username = (typeof message.username === 'string') ? message.username : '[undefined]';
   var text = (typeof message.text === 'string') ? message.text : '[undefined]';
+  var roomname = (typeof message.roomname === 'string') ? message.roomname : '[undefined]';
 
   var usernameHtml = '<a href="#" class="username">' + app._sanitize(username) + '</a>';
-  var newNode = $( "<p>" + usernameHtml + ": " + app._sanitize(text) + "</p>" );
+  var newNode = $( '<p data-roomname="' + roomname + '">' + usernameHtml + ': ' + app._sanitize(text) + '</p>' );
   $('#chats').prepend(newNode);
+
+  //add a room if the chatroom is new
+  if (!app._roomNames[roomname]) {
+    app.addRoom(roomname);
+    app._roomNames[roomname] = roomname; //dummy value
+  }
 };
 
 app.addRoom = function(roomName) {
-  var newNode = $( "<p>" + roomName + "</p>" );
+  var newNode = $( '<li><a href="#">' + roomName + '</li>' );
   $('#roomSelect').append(newNode);
 }
 
-app.addFriend = function() {
+app.addFriend = function(event) {
+  //get username from event
+  //console.log("adding");
 
+  var friendName = event.target.childNodes[0].data;
+  if (!app._friendNames[friendName]) {
+    var $friendNode = $('<li>' + friendName + '</li>');
+    $('#friendsList').prepend($friendNode);
+    app._friendNames[friendName] = friendName; //dummy value
+  }
 };
 
 app.handleSubmit = function(event) {
@@ -86,6 +106,19 @@ app.handleSubmit = function(event) {
   app.send(new Message('hello', text));
   //remove the text from inputBox
   $('#inputbox').val('');
+};
+
+app.handleRoomSelect = function(event) {
+  var roomName = event.target.childNodes[0].data;
+  $('#chats p').each(function(index, node) {
+    //access roomname of node
+    var currRoomName = node.dataset.roomname;
+    if (currRoomName === roomName) {
+      node.style.display = "block";
+    } else {
+      node.style.display = "none";
+    }
+  });
 };
 
 app._sanitize = function(str) {
@@ -123,12 +156,15 @@ app._getMessages = function(response) {
   while (message = newMessages.pop()) {
     app.addMessage(message);
   }
+
+  app.init();
 };
 
-var updateMessages = function() {
-  $.get('https://api.parse.com/1/classes/chatterbox', 'abc', app._getMessages);
+app._updateMessages = function() {
+  $.get('https://api.parse.com/1/classes/chatterbox', null, app._getMessages);
 };
-setInterval(updateMessages, 1000);
+
+setInterval(app._updateMessages, 1000);
 
 
 //------------- sandbox --------------
@@ -138,9 +174,6 @@ var Message = function(roomname, text) {
   this.text = text;
   this.username = app._username;
 };
-
-//var message = new Message('lobby', 'It\'s good to be the king', 'Gloria & Max');
-//app.send(message, function() { console.log("ok"); });
 
 app._makeChatForm = function() {
   //create a form in jquery
@@ -153,7 +186,22 @@ app._makeChatForm = function() {
   $chatForm.append($submitButton);
 };
 
+app._makeChatRoomsList = function() {
+  var $chatRoomsList = $('<ul id="roomSelect"></ul>');
+  //append it to body
+  $('#main').append($chatRoomsList);
+}
+
+app._makeFriendsList = function() {
+  //create a list in jquery
+  var $friendsList = $('<ul id="friendsList"></ul>');
+  //append it to body
+  $('#main').append($friendsList);
+};
+
 window.onload = function() {
   app._makeChatForm();
+  app._makeChatRoomsList();
+  app._makeFriendsList();
   app.init();
 };
