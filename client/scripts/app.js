@@ -1,7 +1,7 @@
 // YOUR CODE HERE:
 var app = {};
 
-app.escapeMap = {
+app._escapeMap = {
   '&': '&amp;', 
   '<': '&lt;',
   '>': '&gt;',
@@ -22,6 +22,7 @@ app.escapeMap = {
   '[': '&#91;',
   ']': '&#93;',
 }
+app._lastObjectId = null;
 app.server = 'https://api.parse.com/1/classes/chatterbox';
 
 app.init = function() {
@@ -52,13 +53,14 @@ app.clearMessages = function() {
 };
 
 app.addMessage = function(message) {
+  app._lastObjectId = message.objectId;
+
   var username = (typeof message.username === 'string') ? message.username : '[undefined]';
   var text = (typeof message.text === 'string') ? message.text : '[undefined]';
 
-
   var usernameHtml = '<a href="#" class="username">' + app._sanitize(username) + '</a>';
   var newNode = $( "<p>" + usernameHtml + ": " + app._sanitize(text) + "</p>" );
-  $('#chats').append(newNode);
+  $('#chats').prepend(newNode);
 };
 
 app.addRoom = function(roomName) {
@@ -74,22 +76,11 @@ app.handleSubmit = function() {
 
 };
 
-app._printMessages = function(response) {
-  console.log("hi");
-  console.log(arguments);
-  var messages = response.results;
-  for (var i = 0; i < messages.length; i++) {
-    app.addMessage(messages[i]);
-  }
-};
-
 app._sanitize = function(str) {
   var result = '';
   for (var i = 0; i < str.length; i++) {
-    if (str[i] === '<') {
-      result += '&lt;';
-    } else if(str[i] === '>') {
-      result += '&gt;';
+    if (str[i] in app._escapeMap) {
+      result += app._escapeMap[str[i]];
     } else {
       result += str[i];
     }
@@ -97,24 +88,47 @@ app._sanitize = function(str) {
   return result;
 };
 
-//------------- sandbox --------------
+//------------- poll for new updates --------------
+app._getMessages = function(response) {
+  var allMessages = response.results;
 
-var message = {
-  username: 'Gloria&Max Mel Brooks',
-  text: 'It\'s good to be the king',
-  roomname: 'lobby'
+  var message;
+
+  //newMessages = empty array
+  var newMessages = [];
+  //traverse from beginning
+  for(var i = 0; i < allMessages.length; i++) {
+    message = allMessages[i];
+    //if objectId is unseen before 
+    if(message.objectId === app._lastObjectId) {
+      break;
+    } else {
+      //push message to newMessages
+      newMessages.push(message);
+    }
+  }
+  //using newMessages as a stack, prepend to #chats
+  while (message = newMessages.pop()) {
+    app.addMessage(message);
+  }
 };
 
+var updateMessages = function() {
+  $.get('https://api.parse.com/1/classes/chatterbox', 'abc', app._getMessages);
+};
+setInterval(updateMessages, 1000);
+
+
+//------------- sandbox --------------
+
 var Message = function(roomname, text, username) {
-  this.opponents = {};
   this.roomname = "Gloria and Max";
   this.text = text;
   this.username = 'rhodia';
 };
 
-//app.send(message, function() { console.log("ok"); });
-//$.post('https://api.parse.com/1/classes/chatterbox', new Message("test from Max and Gloria"), function() {console.log("success");});
+var message = new Message('lobby', 'It\'s good to be the king', 'Gloria & Max');
 
-
-
+app.send(message, function() { console.log("ok"); });
 $.get('https://api.parse.com/1/classes/chatterbox', 'abc', app._printMessages);
+//$.post('https://api.parse.com/1/classes/chatterbox', new Message("test from Max and Gloria"), function() {console.log("success");});
