@@ -20,15 +20,19 @@ app._escapeMap = {
   '{': '&#123;',
   '}': '&#125;',
   '[': '&#91;',
-  ']': '&#93;',
+  ']': '&#93;'
 }
+
 app._lastObjectId = null;
+
+app._username = window.location.search.split('=')[1];
+
 app.server = 'https://api.parse.com/1/classes/chatterbox';
 
 app.init = function() {
   $('.username').on("click", app.addFriend);
 
-  $('#send .submit').on("submit", app.handleSubmit);
+  $('#send .submit').on("click", app.handleSubmit);
 };
 
 app.send = function(message, success) {
@@ -72,8 +76,16 @@ app.addFriend = function() {
 
 };
 
-app.handleSubmit = function() {
+app.handleSubmit = function(event) {
+  event.stopPropagation();
+  event.preventDefault();
 
+  //get the text from inputBox
+  var text = $('#inputbox').val();
+  //call app.send on that text
+  app.send(new Message('hello', text));
+  //remove the text from inputBox
+  $('#inputbox').val('');
 };
 
 app._sanitize = function(str) {
@@ -121,14 +133,27 @@ setInterval(updateMessages, 1000);
 
 //------------- sandbox --------------
 
-var Message = function(roomname, text, username) {
+var Message = function(roomname, text) {
   this.roomname = "Gloria and Max";
   this.text = text;
-  this.username = 'rhodia';
+  this.username = app._username;
 };
 
-var message = new Message('lobby', 'It\'s good to be the king', 'Gloria & Max');
+//var message = new Message('lobby', 'It\'s good to be the king', 'Gloria & Max');
+//app.send(message, function() { console.log("ok"); });
 
-app.send(message, function() { console.log("ok"); });
-$.get('https://api.parse.com/1/classes/chatterbox', 'abc', app._printMessages);
-//$.post('https://api.parse.com/1/classes/chatterbox', new Message("test from Max and Gloria"), function() {console.log("success");});
+app._makeChatForm = function() {
+  //create a form in jquery
+  var $chatForm = $('<form id="send"></form>');
+  var $inputBox = $('<input type="text" id="inputbox"></input>');
+  var $submitButton = $('<input type="submit" class="submit"></input>');
+  //append it to body
+  $('#main').append($chatForm);
+  $chatForm.append($inputBox);
+  $chatForm.append($submitButton);
+};
+
+window.onload = function() {
+  app._makeChatForm();
+  app.init();
+};
