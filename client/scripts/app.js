@@ -1,5 +1,11 @@
 // YOUR CODE HERE:
-var app = {};
+var app = {
+  _lastObjectId: null,
+  _username: window.location.search.split('=')[1],
+  _friendNames: {},
+  _roomNames: {},
+  server: 'https://api.parse.com/1/classes/chatterbox'
+};
 
 app._escapeMap = {
   '&': '&amp;', 
@@ -23,22 +29,13 @@ app._escapeMap = {
   ']': '&#93;'
 }
 
-app._lastObjectId = null;
-
-app._username = window.location.search.split('=')[1];
-
-app._friendNames = {};
-app._roomNames = {};
-
-app.server = 'https://api.parse.com/1/classes/chatterbox';
-
 app.init = function() {
   $('.username').on("click", app.addFriend);
-
   $('#send .submit').on("click", app.handleSubmit);
-
   $('#roomSelect a').on("click", app.handleRoomSelect);
 };
+
+//------------- AJAX --------------
 
 app.send = function(message, success) {
   $.ajax({
@@ -46,7 +43,6 @@ app.send = function(message, success) {
     url: 'https://api.parse.com/1/classes/chatterbox',
     data: JSON.stringify(message),
     success: success
-    // dataType: dataType
   });
 };
 
@@ -56,6 +52,8 @@ app.fetch = function() {
     url: 'https://api.parse.com/1/classes/chatterbox'
   });
 };
+
+//---------------------------------
 
 app.clearMessages = function() {
   $('#chats').children().remove();
@@ -81,16 +79,17 @@ app.addMessage = function(message) {
 
 app.addRoom = function(roomName) {
   var newNode = $( '<li><a href="#">' + roomName + '</li>' );
+
   $('#roomSelect').append(newNode);
 }
 
 app.addFriend = function(event) {
   //get username from event
-  //console.log("adding");
-
   var friendName = event.target.childNodes[0].data;
+
   if (!app._friendNames[friendName]) {
     var $friendNode = $('<li>' + friendName + '</li>');
+
     $('#friendsList').prepend($friendNode);
     app._friendNames[friendName] = friendName; //dummy value
   }
@@ -102,14 +101,16 @@ app.handleSubmit = function(event) {
 
   //get the text from inputBox
   var text = $('#inputbox').val();
+
   //call app.send on that text
-  app.send(new Message('hello', text));
+  app.send(new Message('hello', text), app.init);
   //remove the text from inputBox
   $('#inputbox').val('');
 };
 
 app.handleRoomSelect = function(event) {
   var roomName = event.target.childNodes[0].data;
+
   $('#chats p').each(function(index, node) {
     //access roomname of node
     var currRoomName = node.dataset.roomname;
@@ -123,6 +124,7 @@ app.handleRoomSelect = function(event) {
 
 app._sanitize = function(str) {
   var result = '';
+
   for (var i = 0; i < str.length; i++) {
     if (str[i] in app._escapeMap) {
       result += app._escapeMap[str[i]];
@@ -136,11 +138,9 @@ app._sanitize = function(str) {
 //------------- poll for new updates --------------
 app._getMessages = function(response) {
   var allMessages = response.results;
-
   var message;
-
-  //newMessages = empty array
   var newMessages = [];
+
   //traverse from beginning
   for(var i = 0; i < allMessages.length; i++) {
     message = allMessages[i];
@@ -155,9 +155,8 @@ app._getMessages = function(response) {
   //using newMessages as a stack, prepend to #chats
   while (message = newMessages.pop()) {
     app.addMessage(message);
+    console.log(message);
   }
-
-  app.init();
 };
 
 app._updateMessages = function() {
@@ -170,7 +169,7 @@ setInterval(app._updateMessages, 1000);
 //------------- sandbox --------------
 
 var Message = function(roomname, text) {
-  this.roomname = "Gloria and Max";
+  this.roomname = roomname;
   this.text = text;
   this.username = app._username;
 };
@@ -180,6 +179,7 @@ app._makeChatForm = function() {
   var $chatForm = $('<form id="send"></form>');
   var $inputBox = $('<input type="text" id="inputbox"></input>');
   var $submitButton = $('<input type="submit" class="submit"></input>');
+
   //append it to body
   $('#main').append($chatForm);
   $chatForm.append($inputBox);
@@ -188,6 +188,7 @@ app._makeChatForm = function() {
 
 app._makeChatRoomsList = function() {
   var $chatRoomsList = $('<ul id="roomSelect"></ul>');
+
   //append it to body
   $('#main').append($chatRoomsList);
 }
@@ -195,6 +196,7 @@ app._makeChatRoomsList = function() {
 app._makeFriendsList = function() {
   //create a list in jquery
   var $friendsList = $('<ul id="friendsList"></ul>');
+
   //append it to body
   $('#main').append($friendsList);
 };
