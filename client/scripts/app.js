@@ -51,16 +51,16 @@ app.init = function() {
     $('#main').append($friendsList);
   }());
 
-  setInterval(function() { app.fetch(app._updateMessages); }, 1000);
+  setInterval(function() { app.fetch(app.update); }, 1000);
 };
 
 //poll for new messages and adds them to DOM
-app._updateMessages = function(response) {
+app.update = function(response) {
 
-  var addMessage = function(message) {
-    // -- helper functions --
-    var sanitize = function(str) {
+  // ---- helper functions ----
+  var sanitize = function(message) {
 
+    var sanitizeText = function(str) {
       var escapeMap = {
         '&': '&amp;', 
         '<': '&lt;',
@@ -84,7 +84,6 @@ app._updateMessages = function(response) {
       }
 
       var result = '';
-
       for (var i = 0; i < str.length; i++) {
         if (str[i] in escapeMap) {
           result += escapeMap[str[i]];
@@ -95,43 +94,39 @@ app._updateMessages = function(response) {
       return result;
     };
 
-    var addRoom = function(roomName) {
-      var $newNode = $( '<li><a href="#">' + roomName + '</li>' );
+    var newObj = {}
 
-      $('#roomSelect').append($newNode);
-      $newNode.on("click", app.handleRoomSelect);
-    }
+    //extract data from message (supplying defaults where given types are incorrect)
+    newObj.username = (typeof message.username === 'string') ? sanitizeText(message.username) : '[undefined]';
+    newObj.text = (typeof message.text === 'string') ? sanitizeText(message.text) : '[undefined]';
+    newObj.roomname = (typeof message.roomname === 'string') ? sanitizeText(message.roomname) : '[undefined]';
 
-    // -- function body --
-    app._lastObjectId = message.objectId;
+    return newObj;
+  }
+  
+  var addRoom = function(roomName) {
+    var $newNode = $( '<li><a href="#">' + roomName + '</li>' );
 
-    //extract and sanitize data from message
-    var username = (typeof message.username === 'string') ? message.username : '[undefined]';
-    var text = (typeof message.text === 'string') ? message.text : '[undefined]';
-    var roomname = (typeof message.roomname === 'string') ? message.roomname : '[undefined]';
-    var objectId = message.objectId; //guaranteed clean and defined by server
+    $('#roomSelect').append($newNode);
+    $newNode.on("click", app.handleRoomSelect);
+  }
 
+  var addMessage = function(username, text, roomname, objectId) {
     //create message node and add to DOM
     var $usernameNode = $('<a href="#" class="username" data-objectid="' + objectId + '"></a>');
-    $usernameNode.append(sanitize(username));
+    $usernameNode.append(username);
 
     var $newNode = $( '<p data-roomname="' + roomname + '"></p>' );
     $newNode.append($usernameNode);
-    $newNode.append(': ' + sanitize(text));
+    $newNode.append(': ' + text);
 
     $('#chats').prepend($newNode);
 
     //add listener to username link: when clicked, friend will be added to friends list
     $usernameNode.on("click", app.handleClickFriend);
+  }
 
-    //add a room if the room is new
-    if (!app._roomNames[roomname]) {
-      addRoom(roomname);
-      app._roomNames[roomname] = roomname; //dummy value
-    }
-  };
-
-  //function starts here:
+  // ---- function body ----
   var allMessages = response.results;
   var message;
 
@@ -148,10 +143,22 @@ app._updateMessages = function(response) {
     }
   }
 
-  //call addMessage for each new message (rendering most recent first)
+  //update app._lastObjectId to the most recent
+  app._lastObjectId = allMessages[0].objectId;
+
+  // deal with each new message (rendering most recent first)
   while (message = newMessages.pop()) {
-    addMessage(message);
-    console.log(message);
+    console.log("new");
+    var cleanMessage = sanitize(message);
+
+    //add message
+    addMessage(cleanMessage.username, cleanMessage.text, cleanMessage.roomname, message.objectId);
+
+    //add a room if the room is new
+    if (!app._roomNames[cleanMessage.roomname]) {
+      addRoom(cleanMessage.roomname);
+      app._roomNames[cleanMessage.roomname] = cleanMessage.roomname; //dummy value
+    }
   }
 };
 
@@ -216,20 +223,20 @@ app.handleRoomSelect = function(event) {
 
 //------------- AJAX --------------
 
-app.send = function(message, success) {
+app.send = function(message, successCallback) {
   $.ajax({
     type: "POST",
     url: 'https://api.parse.com/1/classes/chatterbox',
     data: JSON.stringify(message),
-    success: success
+    success: successCallback
   });
 };
 
-app.fetch = function(success) {
+app.fetch = function(successCallback) {
   $.ajax({
     type: "GET",
     url: 'https://api.parse.com/1/classes/chatterbox',
-    success: app._updateMessages
+    success: successCallback
   });
 };
 
